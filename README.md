@@ -10,21 +10,21 @@ The objective of Week 1 is to create a UDP server using Python's `asyncio` modul
 
 The server:
 
-- Listens for incoming UDP messages.
-- Receives messages from clients.
-- Decodes the received message.
-- Sends a response back to the client.
+* Listens for incoming UDP messages.
+* Receives messages from clients.
+* Decodes the received message.
+* Sends a response back to the client.
 
 ### Files
 
-- `server.py` - UDP server implementation.
-- `client.py` - UDP client implementation.
-- `README.md` - Project documentation.
+* `server.py` - UDP server implementation.
+* `client.py` - UDP client implementation.
+* `README.md` - Project documentation.
 
 ### Requirements
 
-- Python 3.x
-- No external dependencies required.
+* Python 3.x
+* No external dependencies required.
 
 ---
 
@@ -34,10 +34,10 @@ The UDP client is implemented using Python's `asyncio` module.
 
 ### Responsibilities
 
-- Sends messages to the UDP server.
-- Receives responses from the UDP server.
-- Decodes and displays the server response.
-- Communicates with the UDP server asynchronously.
+* Sends messages to the UDP server.
+* Receives responses from the UDP server.
+* Decodes and displays the server response.
+* Communicates with the UDP server asynchronously.
 
 ### Testing
 
@@ -53,3 +53,12 @@ Start the UDP server first:
 
 ```bash
 python server.py
+```
+
+Then, in another terminal, run the UDP client:
+
+```bash
+python client.py
+```
+
+The client sends a message to the server and displays the response received from the server.
