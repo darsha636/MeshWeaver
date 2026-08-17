@@ -9,7 +9,7 @@ class UDPClientProtocol(asyncio.DatagramProtocol):
     def connection_made(self, transport):
         self.transport = transport
 
-        message = "Hello MeshWeaver"
+        message = input("Enter message: ")
 
         print(f"Sending message: {message}")
 
@@ -26,7 +26,10 @@ class UDPClientProtocol(asyncio.DatagramProtocol):
         self.transport.close()
 
     def error_received(self, exc):
-        print(f"Error: {exc}")
+        print(f"UDP error: {exc}")
+
+    def connection_lost(self, exc):
+        print("UDP client stopped.")
 
 
 async def main():
@@ -38,9 +41,11 @@ async def main():
         remote_addr=(SERVER_HOST, SERVER_PORT)
     )
 
-    await asyncio.sleep(2)
+    try:
+        await asyncio.sleep(5)
 
-    transport.close()
+    finally:
+        transport.close()
 
 
 if __name__ == "__main__":

@@ -15,30 +15,41 @@ The server:
 - Decodes the received message.
 - Sends a response back to the client.
 
-## Files
+### Files
 
-### server.py
+- `server.py` - UDP server implementation.
+- `client.py` - UDP client implementation.
+- `README.md` - Project documentation.
 
-Contains the asynchronous UDP server.
+### Requirements
 
-### client.py
+- Python 3.x
+- No external dependencies required.
 
-A simple UDP client used to test the server.
+---
 
-### README.md
+## Person 2 - UDP Client
 
-Contains project documentation and instructions.
+The UDP client is implemented using Python's `asyncio` module.
 
-## Requirements
+### Responsibilities
 
-- Python 3
-- No external packages are required.
+- Sends messages to the UDP server.
+- Receives responses from the UDP server.
+- Decodes and displays the server response.
+- Communicates with the UDP server asynchronously.
 
-## How to Run
+### Testing
 
-### 1. Start the UDP Server
+The UDP client was tested successfully with the UDP server running on localhost.
 
-Open a terminal and run:
+### Communication Flow
+
+UDP Client → Sends Message → UDP Server → Sends Response → UDP Client
+
+### Running the UDP Client
+
+Start the UDP server first:
 
 ```bash
 python server.py
