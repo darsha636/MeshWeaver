@@ -1,4 +1,5 @@
 import asyncio
+import cloudpickle
 
 HOST = "127.0.0.1"
 PORT = 9999
@@ -14,18 +15,20 @@ class UDPServerProtocol(asyncio.DatagramProtocol):
         print("Waiting for messages...")
 
     def datagram_received(self, data, addr):
-        message = data.decode("utf-8")
+        try:
+            function, arguments = cloudpickle.loads(data)
 
-        print(f"Received from {addr}: {message}")
+            result = function(*arguments)
 
-        response = f"Server received: {message}"
+            response = cloudpickle.dumps(result)
 
-        self.transport.sendto(
-            response.encode("utf-8"),
-            addr
-        )
+            self.transport.sendto(response, addr)
 
-        print(f"Response sent to {addr}")
+            print(f"Executed function from {addr}")
+            print(f"Result: {result}")
+
+        except Exception as e:
+            print(f"Error: {e}")
 
     def error_received(self, exc):
         print(f"UDP error: {exc}")
