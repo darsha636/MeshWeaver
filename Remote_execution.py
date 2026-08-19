@@ -10,7 +10,35 @@ def add(a, b):
     return a + b
 
 
+class RemoteExecutionProtocol(asyncio.DatagramProtocol):
+
+    def __init__(self):
+        self.transport = None
+        self.result_received = asyncio.Event()
+
+    def connection_made(self, transport):
+        self.transport = transport
+
+    def datagram_received(self, data, addr):
+        try:
+            # Deserialize the result received from the server
+            result = cloudpickle.loads(data)
+
+            print(f"Result: {result}")
+
+            self.result_received.set()
+
+        except Exception as e:
+            print(f"Error receiving result: {e}")
+            self.result_received.set()
+
+    def error_received(self, exc):
+        print(f"UDP error: {exc}")
+        self.result_received.set()
+
+
 async def send_function():
+
     loop = asyncio.get_running_loop()
 
     # Serialize function and arguments
@@ -18,7 +46,7 @@ async def send_function():
 
     # Create UDP connection
     transport, protocol = await loop.create_datagram_endpoint(
-        lambda: asyncio.DatagramProtocol(),
+        lambda: RemoteExecutionProtocol(),
         remote_addr=(HOST, PORT)
     )
 
@@ -27,10 +55,15 @@ async def send_function():
     # Send serialized function
     transport.sendto(payload)
 
-    # Keep connection open briefly
-    await asyncio.sleep(1)
+    # Wait for server response
+    try:
+        await asyncio.wait_for(protocol.result_received.wait(), timeout=5)
 
-    transport.close()
+    except asyncio.TimeoutError:
+        print("Timeout: No response received from server.")
+
+    finally:
+        transport.close()
 
 
 if __name__ == "__main__":
