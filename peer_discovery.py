@@ -25,7 +25,9 @@ class PeerDiscoveryProtocol(asyncio.DatagramProtocol):
 
     def datagram_received(self, data, addr):
         try:
-            message = json.loads(data.decode("utf-8"))
+            message = json.loads(
+                data.decode("utf-8")
+            )
 
             if message.get("type") == DISCOVER_PEERS:
                 self.send_peer_list(addr)
@@ -34,24 +36,30 @@ class PeerDiscoveryProtocol(asyncio.DatagramProtocol):
                 self.add_discovered_peers(message)
 
         except Exception as e:
-            print(f"Error processing message: {e}")
+            print(
+                f"Error processing message: {e}"
+            )
 
     def send_peer_list(self, addr):
+
         peers = []
 
-        # Add this node's information
+        # This node
         peers.append({
             "node_id": self.node.node_id,
             "host": self.node.host,
-            "port": self.node.port
+            "port": self.node.port,
+            "gossip_port": self.node.gossip_port
         })
 
-        # Add other known peers
+        # Known peers
         for peer in self.node.routing_table.get_peers():
+
             peers.append({
                 "node_id": peer.node_id,
                 "host": peer.host,
-                "port": peer.port
+                "port": peer.port,
+                "gossip_port": peer.gossip_port
             })
 
         response = {
@@ -69,6 +77,7 @@ class PeerDiscoveryProtocol(asyncio.DatagramProtocol):
         )
 
     def add_discovered_peers(self, message):
+
         peers = message.get("peers", [])
 
         for peer in peers:
@@ -79,14 +88,18 @@ class PeerDiscoveryProtocol(asyncio.DatagramProtocol):
             added = self.node.add_peer(
                 peer["node_id"],
                 peer["host"],
-                peer["port"]
+                peer["port"],
+                peer.get("gossip_port")
             )
 
             if added:
+
                 print(
                     f"Discovered peer: "
                     f"{peer['node_id']} "
-                    f"{peer['host']}:{peer['port']}"
+                    f"{peer['host']}:{peer['port']} "
+                    f"(gossip: "
+                    f"{peer.get('gossip_port')})"
                 )
 
 
@@ -94,21 +107,33 @@ async def start_node(node):
 
     loop = asyncio.get_running_loop()
 
-    transport, protocol = await loop.create_datagram_endpoint(
-        lambda: PeerDiscoveryProtocol(node),
-        local_addr=(node.host, node.port)
+    transport, protocol = (
+        await loop.create_datagram_endpoint(
+            lambda: PeerDiscoveryProtocol(node),
+            local_addr=(
+                node.host,
+                node.port
+            )
+        )
     )
 
     return transport
 
 
-async def request_peers(node, peer_host, peer_port):
+async def request_peers(
+    node,
+    peer_host,
+    peer_port
+):
 
+    # Send discovery request using a temporary UDP socket.
     loop = asyncio.get_running_loop()
 
-    transport, protocol = await loop.create_datagram_endpoint(
-        lambda: PeerDiscoveryProtocol(node),
-        local_addr=(node.host, 0)
+    transport, _ = (
+        await loop.create_datagram_endpoint(
+            lambda: asyncio.DatagramProtocol(),
+            local_addr=(node.host, 0)
+        )
     )
 
     message = {
@@ -125,16 +150,21 @@ async def request_peers(node, peer_host, peer_port):
         f"{peer_host}:{peer_port}"
     )
 
-    await asyncio.sleep(2)
-
     transport.close()
 
 
 async def main():
 
     if len(sys.argv) < 2:
-        print("Usage: py peer_discovery.py <port>")
-        print("Example: py peer_discovery.py 8000")
+
+        print(
+            "Usage: py peer_discovery.py <port>"
+        )
+
+        print(
+            "Example: py peer_discovery.py 8000"
+        )
+
         return
 
     port = int(sys.argv[1])
@@ -144,7 +174,9 @@ async def main():
         port=port
     )
 
-    print("\n===== DHT Peer Discovery Node =====")
+    print(
+        "\n===== DHT Peer Discovery Node ====="
+    )
 
     node.display_info()
 
@@ -152,7 +184,6 @@ async def main():
 
     try:
 
-        # Node A (8000) asks Node B (8001)
         if port == 8000:
 
             await asyncio.sleep(2)
@@ -163,32 +194,11 @@ async def main():
                 8001
             )
 
-            await asyncio.sleep(2)
-
-            print("\n===== Node A Routing Table =====")
-
-            peers = node.routing_table.get_peers()
-
-            if not peers:
-                print("No peers discovered.")
-
-            else:
-                for peer in peers:
-                    print(
-                        f"Node ID : {peer.node_id}"
-                    )
-                    print(
-                        f"Host    : {peer.host}"
-                    )
-                    print(
-                        f"Port    : {peer.port}"
-                    )
-                    print("-----------------------------")
-
         else:
 
             print(
-                f"Node {port} is waiting for discovery requests..."
+                f"Node {port} is waiting "
+                f"for discovery requests..."
             )
 
         await asyncio.Future()
@@ -197,6 +207,7 @@ async def main():
         pass
 
     finally:
+
         transport.close()
 
 
