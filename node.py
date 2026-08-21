@@ -1,34 +1,57 @@
 import hashlib
 import os
 
-from routing_table import RoutingTable
+from routing_table import RoutingTable, Peer
 
 
 class KademliaNode:
-    def __init__(self, host="127.0.0.1", port=8000):
+    def __init__(
+        self,
+        host="127.0.0.1",
+        port=8000,
+        gossip_port=None
+    ):
         self.host = host
         self.port = port
 
-        # Generate a unique 160-bit Kademlia node ID
-        random_data = os.urandom(32)
-        self.node_id = hashlib.sha1(random_data).hexdigest()
+        # Gossip uses a separate UDP port.
+        self.gossip_port = (
+            gossip_port
+            if gossip_port is not None
+            else port + 1000
+        )
 
-        # Initialize routing table
+        # Generate a unique 160-bit Kademlia node ID.
+        random_data = os.urandom(32)
+        self.node_id = hashlib.sha1(
+            random_data
+        ).hexdigest()
+
+        # Initialize routing table.
         self.routing_table = RoutingTable()
 
-    def add_peer(self, node_id, host, port):
+    def add_peer(
+        self,
+        node_id,
+        host,
+        port,
+        gossip_port=None
+    ):
         """Add another node to the routing table."""
+
         peer = self.routing_table.find_peer(node_id)
 
         if peer is not None:
             return False
 
-        from routing_table import Peer
+        if gossip_port is None:
+            gossip_port = port + 1000
 
         new_peer = Peer(
             node_id=node_id,
             host=host,
-            port=port
+            port=port,
+            gossip_port=gossip_port
         )
 
         return self.routing_table.add_peer(new_peer)
@@ -43,10 +66,11 @@ class KademliaNode:
 
     def display_info(self):
         print("===== MeshWeaver Kademlia Node =====")
-        print(f"Node ID : {self.node_id}")
-        print(f"Host    : {self.host}")
-        print(f"Port    : {self.port}")
-        print(f"Peers   : {self.routing_table.count()}")
+        print(f"Node ID     : {self.node_id}")
+        print(f"Host        : {self.host}")
+        print(f"Discovery   : {self.port}")
+        print(f"Gossip      : {self.gossip_port}")
+        print(f"Peers       : {self.routing_table.count()}")
         print("Routing table initialized successfully.")
         print("Node initialized successfully.")
 

@@ -8,6 +8,7 @@ class Peer:
     node_id: str
     host: str
     port: int
+    gossip_port: int
 
 
 class RoutingTable:
