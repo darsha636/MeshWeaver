@@ -16,6 +16,7 @@ class PeerDiscoveryProtocol(asyncio.DatagramProtocol):
         self.transport = None
 
     def connection_made(self, transport):
+
         self.transport = transport
 
         print(
@@ -24,18 +25,25 @@ class PeerDiscoveryProtocol(asyncio.DatagramProtocol):
         )
 
     def datagram_received(self, data, addr):
+
         try:
+
             message = json.loads(
                 data.decode("utf-8")
             )
 
-            if message.get("type") == DISCOVER_PEERS:
+            message_type = message.get("type")
+
+            if message_type == DISCOVER_PEERS:
+
                 self.send_peer_list(addr)
 
-            elif message.get("type") == PEER_LIST:
+            elif message_type == PEER_LIST:
+
                 self.add_discovered_peers(message)
 
         except Exception as e:
+
             print(
                 f"Error processing message: {e}"
             )
@@ -44,7 +52,7 @@ class PeerDiscoveryProtocol(asyncio.DatagramProtocol):
 
         peers = []
 
-        # This node
+        # Add this node.
         peers.append({
             "node_id": self.node.node_id,
             "host": self.node.host,
@@ -52,7 +60,7 @@ class PeerDiscoveryProtocol(asyncio.DatagramProtocol):
             "gossip_port": self.node.gossip_port
         })
 
-        # Known peers
+        # Add known peers.
         for peer in self.node.routing_table.get_peers():
 
             peers.append({
@@ -121,20 +129,12 @@ async def start_node(node):
 
 
 async def request_peers(
-    node,
+    transport,
     peer_host,
     peer_port
 ):
-
-    # Send discovery request using a temporary UDP socket.
-    loop = asyncio.get_running_loop()
-
-    transport, _ = (
-        await loop.create_datagram_endpoint(
-            lambda: asyncio.DatagramProtocol(),
-            local_addr=(node.host, 0)
-        )
-    )
+    """Send discovery request using the existing
+    discovery socket."""
 
     message = {
         "type": DISCOVER_PEERS
@@ -150,7 +150,7 @@ async def request_peers(
         f"{peer_host}:{peer_port}"
     )
 
-    transport.close()
+    await asyncio.sleep(2)
 
 
 async def main():
@@ -189,7 +189,7 @@ async def main():
             await asyncio.sleep(2)
 
             await request_peers(
-                node,
+                transport,
                 "127.0.0.1",
                 8001
             )
@@ -204,6 +204,7 @@ async def main():
         await asyncio.Future()
 
     except asyncio.CancelledError:
+
         pass
 
     finally:
@@ -214,7 +215,9 @@ async def main():
 if __name__ == "__main__":
 
     try:
+
         asyncio.run(main())
 
     except KeyboardInterrupt:
+
         print("\nNode stopped.")
