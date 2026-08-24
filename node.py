@@ -5,6 +5,7 @@ from routing_table import RoutingTable, Peer
 
 
 class KademliaNode:
+
     def __init__(
         self,
         host="127.0.0.1",
@@ -23,6 +24,7 @@ class KademliaNode:
 
         # Generate a unique 160-bit Kademlia node ID.
         random_data = os.urandom(32)
+
         self.node_id = hashlib.sha1(
             random_data
         ).hexdigest()
@@ -39,9 +41,7 @@ class KademliaNode:
     ):
         """Add another node to the routing table."""
 
-        peer = self.routing_table.find_peer(node_id)
-
-        if peer is not None:
+        if self.routing_table.find_peer(node_id):
             return False
 
         if gossip_port is None:
@@ -65,6 +65,7 @@ class KademliaNode:
         return self.routing_table.find_peer(node_id)
 
     def display_info(self):
+
         print("===== MeshWeaver Kademlia Node =====")
         print(f"Node ID     : {self.node_id}")
         print(f"Host        : {self.host}")
@@ -76,5 +77,6 @@ class KademliaNode:
 
 
 if __name__ == "__main__":
+
     node = KademliaNode()
     node.display_info()

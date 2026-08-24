@@ -15,9 +15,12 @@ class GossipProtocol(asyncio.DatagramProtocol):
         self.transport = None
 
     def connection_made(self, transport):
+
         self.transport = transport
 
-        address = transport.get_extra_info("sockname")
+        address = transport.get_extra_info(
+            "sockname"
+        )
 
         print(
             f"Gossip started on "
@@ -25,8 +28,12 @@ class GossipProtocol(asyncio.DatagramProtocol):
         )
 
     def datagram_received(self, data, addr):
+
         try:
-            message = json.loads(data.decode("utf-8"))
+
+            message = json.loads(
+                data.decode("utf-8")
+            )
 
             if message.get("type") != "gossip":
                 return
@@ -42,11 +49,18 @@ class GossipProtocol(asyncio.DatagramProtocol):
             print(f"Address   : {addr}")
 
         except Exception as e:
-            print(f"Error processing gossip: {e}")
+
+            print(
+                f"Error processing gossip: {e}"
+            )
 
 
 def create_gossip_message(node):
-    cpu_usage = psutil.cpu_percent(interval=0.1)
+
+    cpu_usage = psutil.cpu_percent(
+        interval=0.1
+    )
+
     ram_usage = psutil.virtual_memory().percent
 
     message = {
@@ -69,38 +83,61 @@ async def gossip_loop(node, transport):
         peers = node.routing_table.get_peers()
 
         if not peers:
-            print("\nNo known peers to gossip with.")
+
+            print(
+                "\nNo known peers to gossip with."
+            )
 
         for peer in peers:
 
-            address = (peer.host, peer.port)
+            address = (
+                peer.host,
+                peer.gossip_port
+            )
 
-            transport.sendto(message, address)
+            transport.sendto(
+                message,
+                address
+            )
 
             print(
                 f"\nGossip sent to "
-                f"{peer.node_id} at {address}"
+                f"{peer.node_id[:8]} "
+                f"at {address}"
             )
 
-        await asyncio.sleep(GOSSIP_INTERVAL)
+        await asyncio.sleep(
+            GOSSIP_INTERVAL
+        )
 
 
 async def start_gossip(node):
 
     loop = asyncio.get_running_loop()
 
-    transport, protocol = await loop.create_datagram_endpoint(
-        lambda: GossipProtocol(node),
-        local_addr=(node.host, node.port)
+    transport, protocol = (
+        await loop.create_datagram_endpoint(
+            lambda: GossipProtocol(node),
+            local_addr=(
+                node.host,
+                node.gossip_port
+            )
+        )
     )
 
     try:
-        await gossip_loop(node, transport)
+
+        await gossip_loop(
+            node,
+            transport
+        )
 
     except asyncio.CancelledError:
+
         pass
 
     finally:
+
         transport.close()
 
 
@@ -110,9 +147,12 @@ if __name__ == "__main__":
 
     node = KademliaNode(
         host="127.0.0.1",
-        port=8000
+        port=8000,
+        gossip_port=9000
     )
 
     node.display_info()
 
-    asyncio.run(start_gossip(node))
+    asyncio.run(
+        start_gossip(node)
+    )
