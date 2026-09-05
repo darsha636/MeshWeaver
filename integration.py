@@ -1,6 +1,6 @@
 """
-MeshWeaver Week 2
-Person 4 - Integration & Testing
+MeshWeaver Week 3
+Person 3 - Fault Tolerance
 
 Integrates:
 
@@ -9,6 +9,8 @@ Integrates:
 3. Routing tables
 4. CPU/RAM gossip
 5. Multi-node testing
+6. UDP heartbeat monitoring
+7. Node failure detection
 """
 
 import asyncio
@@ -26,6 +28,11 @@ from gossip import (
     GOSSIP_INTERVAL
 )
 
+from heartbeat_network import (
+    start_heartbeat,
+    send_heartbeats
+)
+
 
 class MeshWeaverNode:
 
@@ -35,7 +42,6 @@ class MeshWeaverNode:
         discovery_port,
         gossip_port
     ):
-
         self.node_number = node_number
 
         self.node = KademliaNode(
@@ -50,6 +56,11 @@ class MeshWeaverNode:
         self.discovery_transport = None
         self.gossip_transport = None
 
+        # Heartbeat components
+        self.heartbeat_transport = None
+        self.heartbeat_task = None
+        self.heartbeat_monitor_task = None
+
     async def start(self):
 
         print(
@@ -58,12 +69,18 @@ class MeshWeaverNode:
 
         self.node.display_info()
 
-        # Start DHT discovery.
+        # -----------------------------------------
+        # 1. Start DHT discovery
+        # -----------------------------------------
+
         self.discovery_transport = (
             await start_node(self.node)
         )
 
-        # Start gossip on a separate UDP port.
+        # -----------------------------------------
+        # 2. Start Gossip service
+        # -----------------------------------------
+
         loop = asyncio.get_running_loop()
 
         self.gossip_transport, _ = (
@@ -81,14 +98,59 @@ class MeshWeaverNode:
             f"{self.node.host}:{self.gossip_port}"
         )
 
+        # -----------------------------------------
+        # 3. Start Heartbeat service
+        # -----------------------------------------
+
+        self.heartbeat_transport = (
+            await start_heartbeat(self.node)
+        )
+
+        # Send heartbeat periodically
+        self.heartbeat_task = asyncio.create_task(
+            send_heartbeats(
+                self.node,
+                self.heartbeat_transport
+            )
+        )
+
+        # Monitor heartbeat timeout
+        self.heartbeat_monitor_task = asyncio.create_task(
+            self.node.start_heartbeat_monitor()
+        )
+
+        print(
+            f"Heartbeat service running on "
+            f"{self.node.host}:{self.node.port + 2000}"
+        )
+
     async def stop(self):
 
-        if self.discovery_transport:
+        # -----------------------------------------
+        # Stop heartbeat
+        # -----------------------------------------
 
+        if self.heartbeat_task:
+            self.heartbeat_task.cancel()
+
+        if self.heartbeat_monitor_task:
+            self.heartbeat_monitor_task.cancel()
+
+        if self.heartbeat_transport:
+            self.heartbeat_transport.close()
+
+        # -----------------------------------------
+        # Stop discovery
+        # -----------------------------------------
+
+        if self.discovery_transport:
             self.discovery_transport.close()
 
-        if self.gossip_transport:
+        # -----------------------------------------
+        # Stop gossip
+        # -----------------------------------------
 
+        if self.gossip_transport:
             self.gossip_transport.close()
 
     async def send_gossip(self):
@@ -157,7 +219,7 @@ async def discover_nodes(nodes):
         nodes[0].discovery_port
     )
 
-    # Allow responses to arrive.
+    # Allow responses to arrive
     await asyncio.sleep(2)
 
 
@@ -203,6 +265,11 @@ def display_routing_tables(nodes):
                     f"{peer.host}:{peer.gossip_port}"
                 )
 
+                print(
+                    f"    Heartbeat: "
+                    f"{peer.host}:{peer.port + 2000}"
+                )
+
 
 async def gossip_test(nodes):
 
@@ -214,18 +281,45 @@ async def gossip_test(nodes):
 
         await mesh_node.send_gossip()
 
-    # Give gossip messages time to arrive.
+    # Give gossip messages time to arrive
     await asyncio.sleep(2)
+
+
+def display_heartbeat_status(nodes):
+
+    print("\n" + "=" * 60)
+    print("HEARTBEAT STATUS")
+    print("=" * 60)
+
+    for mesh_node in nodes:
+
+        active_peers = (
+            mesh_node.node.get_active_peers()
+        )
+
+        print(
+            f"Node {mesh_node.node_number}: "
+            f"{len(active_peers)} active peer(s)"
+        )
+
+        for peer_id in active_peers:
+
+            print(
+                f"  ACTIVE: {peer_id[:8]}..."
+            )
 
 
 async def run_integration():
 
     print("\n" + "=" * 60)
-    print("MESHWEAVER WEEK 2")
-    print("PERSON 4 - INTEGRATION & TESTING")
+    print("MESHWEAVER WEEK 3")
+    print("PERSON 3 - FAULT TOLERANCE")
     print("=" * 60)
 
-    # Create three local nodes.
+    # -----------------------------------------
+    # Create three local nodes
+    # -----------------------------------------
+
     nodes = [
 
         MeshWeaverNode(
@@ -280,7 +374,13 @@ async def run_integration():
         await gossip_test(nodes)
 
         # -----------------------------------------
-        # 5. Continuous gossip
+        # 5. Heartbeat status
+        # -----------------------------------------
+
+        display_heartbeat_status(nodes)
+
+        # -----------------------------------------
+        # 6. Continuous operation
         # -----------------------------------------
 
         print("\n" + "=" * 60)
@@ -288,6 +388,15 @@ async def run_integration():
         print(
             f"Gossip will repeat approximately "
             f"every {GOSSIP_INTERVAL} seconds."
+        )
+
+        print(
+            "Heartbeat is sent approximately "
+            "every 3 seconds."
+        )
+
+        print(
+            "Heartbeat timeout is 10 seconds."
         )
 
         print(
