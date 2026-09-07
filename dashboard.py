@@ -1,211 +1,231 @@
-import asyncio
-import json
+import time
 
 from rich.console import Console, Group
-from rich.live import Live
 from rich.table import Table
+from rich.panel import Panel
+from rich.live import Live
+
+from node import KademliaNode
+from task_router import TaskRouter
 
 
 console = Console()
 
-nodes = {}
-peer_counts = {}
-routing_info = {}
 
-task_status = "IDLE"
-task_result = ""
+# ==========================================
+# CREATE MESHWEAVER NODES
+# ==========================================
+
+nodes = {
+    "NODE1": KademliaNode(
+        host="127.0.0.1",
+        port=8000,
+        gossip_port=9000
+    ),
+
+    "NODE2": KademliaNode(
+        host="127.0.0.1",
+        port=8001,
+        gossip_port=9001
+    ),
+
+    "NODE3": KademliaNode(
+        host="127.0.0.1",
+        port=8002,
+        gossip_port=9002
+    )
+}
 
 
-class DashboardReceiver(asyncio.DatagramProtocol):
+# ==========================================
+# CREATE TASK ROUTER
+# ==========================================
 
-    def datagram_received(self, data, addr):
+router = TaskRouter()
 
-        global task_status
-        global task_result
 
-        try:
-            info = json.loads(data.decode())
+# Add node load information
+router.update_node_load("NODE1", 25, 40)
+router.update_node_load("NODE2", 60, 55)
+router.update_node_load("NODE3", 90, 80)
 
-            message_type = info.get("type")
 
-            # CPU / RAM
-            if message_type is None:
+# ==========================================
+# CONNECT NODES USING ROUTING TABLE
+# ==========================================
 
-                node_id = info["node_id"]
+node_list = list(nodes.items())
 
-                nodes[node_id] = {
-                    "host": info["host"],
-                    "port": info["port"],
-                    "cpu": info["cpu"],
-                    "ram": info["ram"],
-                    "status": "ONLINE"
-                }
+for name, node in node_list:
 
-            # Peer information
-            elif message_type == "peer_status":
+    for other_name, other_node in node_list:
 
-                node_id = info["node_id"]
+        if name != other_name:
 
-                peer_counts[node_id] = info["peer_count"]
-
-            # Routing information
-            elif message_type == "routing_status":
-
-                node_id = info["node_id"]
-
-                routing_info[node_id] = info["peers"]
-
-            # Task information
-            elif message_type == "task_status":
-
-                task_status = info["status"]
-
-                if info.get("result") is not None:
-                    task_result = str(info["result"])
-
-        except (json.JSONDecodeError, KeyError) as error:
-
-            console.print(
-                f"Invalid dashboard message: {error}"
+            node.add_peer(
+                other_node.node_id,
+                other_node.host,
+                other_node.port,
+                other_node.gossip_port
             )
 
 
-def create_node_table():
+# ==========================================
+# TASK INFORMATION
+# ==========================================
 
-    table = Table(
-        title="MeshWeaver Node Dashboard"
-    )
+tasks = [
+    {
+        "task": "Task-1",
+        "node": "NODE1",
+        "status": "COMPLETED"
+    },
 
-    table.add_column("Node ID")
-    table.add_column("Host")
-    table.add_column("Port")
-    table.add_column("CPU")
-    table.add_column("RAM")
-    table.add_column("Peers")
-    table.add_column("Status")
-
-    for node_id, info in nodes.items():
-
-        table.add_row(
-            node_id[:8] + "...",
-            info["host"],
-            str(info["port"]),
-            f'{info["cpu"]:.1f}%',
-            f'{info["ram"]:.1f}%',
-            str(peer_counts.get(node_id, 0)),
-            info["status"]
-        )
-
-    return table
+    {
+        "task": "Task-2",
+        "node": "NODE2",
+        "status": "RUNNING"
+    }
+]
 
 
-def create_task_table():
-
-    table = Table(
-        title="Task Status"
-    )
-
-    table.add_column("Status")
-    table.add_column("Result")
-
-    table.add_row(
-        task_status,
-        task_result if task_result else "-"
-    )
-
-    return table
-
-
-def create_routing_table():
-
-    table = Table(
-        title="Routing Information"
-    )
-
-    table.add_column("Node ID")
-    table.add_column("Peer ID")
-    table.add_column("Discovery")
-    table.add_column("Gossip")
-
-    for node_id, peers in routing_info.items():
-
-        if not peers:
-
-            table.add_row(
-                node_id[:8] + "...",
-                "No peers",
-                "-",
-                "-"
-            )
-
-        else:
-
-            for peer in peers:
-
-                table.add_row(
-                    node_id[:8] + "...",
-                    peer["node_id"][:8] + "...",
-                    f'{peer["host"]}:{peer["port"]}',
-                    f'{peer["host"]}:{peer["gossip_port"]}'
-                )
-
-    return table
-
+# ==========================================
+# CREATE DASHBOARD
+# ==========================================
 
 def create_dashboard():
 
-    return Group(
-        create_node_table(),
-        create_task_table(),
-        create_routing_table()
+    # --------------------------------------
+    # MESH TOPOLOGY TABLE
+    # --------------------------------------
+
+    node_table = Table(
+        title="Mesh Topology"
     )
 
+    node_table.add_column("Node ID")
+    node_table.add_column("Discovery")
+    node_table.add_column("Gossip")
+    node_table.add_column("Peers")
+    node_table.add_column("Status")
 
-async def main():
+    for name, node in nodes.items():
 
-    loop = asyncio.get_running_loop()
+        active_peers = node.get_active_peers()
 
-    transport, _ = await loop.create_datagram_endpoint(
-        DashboardReceiver,
-        local_addr=("127.0.0.1", 9100)
-    )
+        # Determine heartbeat status
+        if len(active_peers) > 0:
+            status = "ACTIVE"
+        else:
+            status = "WAITING"
 
-    console.print(
-        "[bold]MeshWeaver Dashboard started "
-        "on 127.0.0.1:9100[/bold]"
-    )
-
-    try:
-
-        with Live(
-            create_dashboard(),
-            refresh_per_second=1,
-            console=console,
-            screen=True
-        ) as live:
-
-            while True:
-
-                live.update(
-                    create_dashboard(),
-                    refresh=True
-                )
-
-                await asyncio.sleep(1)
-
-    except KeyboardInterrupt:
-
-        pass
-
-    finally:
-
-        transport.close()
-
-        console.print(
-            "\nDashboard stopped."
+        node_table.add_row(
+            name,
+            str(node.port),
+            str(node.gossip_port),
+            str(node.routing_table.count()),
+            status
         )
 
 
-if __name__ == "__main__":
+    # --------------------------------------
+    # TASK EXECUTION TABLE
+    # --------------------------------------
 
-    asyncio.run(main())
+    task_table = Table(
+        title="Task Execution"
+    )
+
+    task_table.add_column("Task")
+    task_table.add_column("Assigned Node")
+    task_table.add_column("Status")
+
+    for task in tasks:
+
+        task_table.add_row(
+            task["task"],
+            task["node"],
+            task["status"]
+        )
+
+
+    # --------------------------------------
+    # TASK ROUTER TABLE
+    # --------------------------------------
+
+    router_table = Table(
+        title="Task Router"
+    )
+
+    router_table.add_column("Node")
+    router_table.add_column("CPU")
+    router_table.add_column("RAM")
+    router_table.add_column("Load")
+    router_table.add_column("Active")
+
+    for node_id, data in router.nodes.items():
+
+        load = router.calculate_load(
+            data["cpu"],
+            data["ram"]
+        )
+
+        router_table.add_row(
+            node_id,
+            f"{data['cpu']}%",
+            f"{data['ram']}%",
+            f"{load:.1f}%",
+            str(data["active"])
+        )
+
+
+    # --------------------------------------
+    # COMBINE ALL TABLES
+    # --------------------------------------
+
+    content = Group(
+        node_table,
+        task_table,
+        router_table
+    )
+
+
+    # --------------------------------------
+    # MAIN DASHBOARD PANEL
+    # --------------------------------------
+
+    return Panel(
+        content,
+        title="MESHWEAVER LIVE DASHBOARD"
+    )
+
+
+# ==========================================
+# RUN DASHBOARD
+# ==========================================
+
+def main():
+
+    print("Starting MeshWeaver Dashboard...")
+
+    with Live(
+        create_dashboard(),
+        refresh_per_second=1,
+        console=console
+    ) as live:
+
+        for _ in range(20):
+
+            live.update(
+                create_dashboard()
+            )
+
+            time.sleep(1)
+
+
+# ==========================================
+# PROGRAM START
+# ==========================================
+
+if __name__ == "__main__":
+    main()
