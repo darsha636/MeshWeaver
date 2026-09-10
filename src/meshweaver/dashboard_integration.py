@@ -8,7 +8,7 @@ from rich.live import Live
 
 from .node import KademliaNode
 from .task_router import TaskRouter
-from heartbeat_network import start_heartbeat, send_heartbeats
+from .heartbeat_network import start_heartbeat, send_heartbeats
 
 
 console = Console()
