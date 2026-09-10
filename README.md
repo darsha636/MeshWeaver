@@ -432,6 +432,3 @@ Each sprint focused on a different layer of the system:
 
 The project demonstrates how independent distributed-system components can be integrated into a lightweight peer-to-peer task broker.
 
-## License
-
-This project is intended for educational and research purposes.
